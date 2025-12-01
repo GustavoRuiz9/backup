@@ -1,0 +1,457 @@
+openapi: "3.0.3"
+info:
+  title: "adm-beneficiarios"
+  version: "1.0.0"
+  description: "API para Administración de Beneficiarios (TEF), generada desde la colección Postman 'Adm Beneficiarios TEF' y con estilo similar a jo-btnpay."
+  contact:
+    name: "Gustavo / Generated"
+    email: "you@example.com"
+  license:
+    name: "Scotiabank Chile All Rights Reserved"
+servers:
+  - url: "http://{host}:{port}/v1"
+    variables:
+      host:
+        default: "localhost"
+      port:
+        default: "8080"
+tags:
+  - name: "Auth"
+    description: "Login / tokens"
+  - name: "Beneficiarios"
+    description: "Operaciones CRUD y firmas sobre beneficiarios"
+  - name: "Banks"
+    description: "Listado de bancos"
+  - name: "Enterprise"
+    description: "Operaciones relacionadas con enterprise"
+  - name: "Risk"
+    description: "Validaciones de riesgo"
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - "Auth"
+      summary: "Login y obtención de token"
+      operationId: "login"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              user_rut: "101002276"
+              client_rut: "101002276"
+              password: "Banco007"
+      responses:
+        "200":
+          description: "Token obtenido"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /beneficiarios:
+    get:
+      tags:
+        - "Beneficiarios"
+      summary: "Listar beneficiarios (vista)"
+      description: "Equivalente a addressee-view?type=TEF&type=LBTR en Postman."
+      operationId: "listBeneficiarios"
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: array
+            items:
+              type: string
+            example: ["TEF","LBTR"]
+          style: form
+          explode: true
+          description: "Tipos a filtrar (TEF, LBTR)"
+        - $ref: "#/components/parameters/AuthorizationHeader"
+      responses:
+        "200":
+          description: "Lista de beneficiarios"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddresseeListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - "Beneficiarios"
+      summary: "Crear beneficiario (simulación/registro pendiente firma)"
+      operationId: "createBeneficiario"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddresseeRegisterRequest"
+      responses:
+        "200":
+          description: "Solicitud de creación recibida (SIMULATE)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /beneficiarios/{id}/authm:
+    put:
+      tags:
+        - "Beneficiarios"
+      summary: "Firmar / confirmar edición de beneficiario"
+      operationId: "confirmEditBeneficiario"
+      parameters:
+        - $ref: "#/components/parameters/AuthorizationHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmEditRequest"
+      responses:
+        "200":
+          description: "Edición confirmada (puede venir en modo SIMULATE o REGISTER)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /beneficiarios/authm:
+    post:
+      tags:
+        - "Beneficiarios"
+      summary: "Firmar creación de beneficiario (agregar)"
+      operationId: "signCreateBeneficiario"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmEditRequest"
+      responses:
+        "200":
+          description: "Creación solicitada y en estado de firma"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationResponse"
+
+  /banks:
+    get:
+      tags:
+        - "Banks"
+      summary: "Listar bancos"
+      operationId: "listBanks"
+      parameters:
+        - $ref: "#/components/parameters/AuthorizationHeader"
+      responses:
+        "200":
+          description: "Lista de bancos"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BanksResponse"
+
+  /enterprise:
+    get:
+      tags:
+        - "Enterprise"
+      summary: "Listar enterprise por serviceType"
+      operationId: "listEnterprise"
+      parameters:
+        - in: query
+          name: serviceType
+          required: false
+          schema:
+            type: string
+          description: "Ej: ADM_BENEF_TRAN"
+        - $ref: "#/components/parameters/AuthorizationHeader"
+      responses:
+        "200":
+          description: "Enterprise list"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnterpriseResponse"
+
+  /risk/validate:
+    get:
+      tags:
+        - "Risk"
+      summary: "Validate risk por bankCode"
+      operationId: "validateRisk"
+      parameters:
+        - in: query
+          name: bankCode
+          schema:
+            type: string
+          required: true
+          description: "Código del banco"
+        - $ref: "#/components/parameters/AuthorizationHeader"
+      responses:
+        "200":
+          description: "Resultado validación de riesgo"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  reason:
+                    type: string
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    AuthorizationHeader:
+      name: Authorization
+      in: header
+      description: "Authorization header Bearer token"
+      required: true
+      schema:
+        type: string
+      example: "Bearer {{token}}"
+    ChannelId:
+      name: x-channel-id
+      in: header
+      required: false
+      schema:
+        type: string
+        enum:
+          - WEB
+          - MOBILE
+      description: "Channel making the request"
+
+  responses:
+    BadRequest:
+      description: "Bad Request"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: "Unauthorized"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: "Internal server error"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    LoginRequest:
+      type: object
+      properties:
+        user_rut:
+          type: string
+        client_rut:
+          type: string
+        password:
+          type: string
+      required:
+        - user_rut
+        - client_rut
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+            expires_in:
+              type: integer
+
+    AddresseeListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Addressee"
+
+    Addressee:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        rut:
+          type: string
+        alias:
+          type: string
+        detail:
+          type: object
+          properties:
+            acc_numbr:
+              type: string
+            acc_type:
+              type: string
+            bank_id:
+              type: integer
+            adr_email:
+              type: string
+            currency:
+              type: string
+        paymentMethods:
+          type: array
+          items:
+            type: string
+        type:
+          type: array
+          items:
+            type: string
+
+    AddresseeRegisterRequest:
+      type: object
+      properties:
+        rut:
+          type: string
+        alias:
+          type: string
+        name:
+          type: string
+        detail:
+          $ref: "#/components/schemas/AddresseeDetail"
+        paymentMethods:
+          type: array
+          items:
+            type: string
+        id:
+          type: integer
+
+    AddresseeDetail:
+      type: object
+      properties:
+        acc_numbr:
+          type: string
+        acc_type:
+          type: string
+        bank_id:
+          type: integer
+        adr_email:
+          type: string
+        currency:
+          type: string
+
+    ConfirmEditRequest:
+      type: object
+      properties:
+        customerID:
+          type: string
+        userID:
+          type: string
+        customerName:
+          type: string
+        userName:
+          type: string
+        authorizers:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+        type:
+          type: string
+        status:
+          type: string
+        data:
+          $ref: "#/components/schemas/Addressee"
+        sign:
+          type: boolean
+        available:
+          type: object
+        auth_account:
+          type: object
+        authorizations:
+          type: object
+
+    OperationResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          description: "Generic operation response (id/operation/state)"
+
+    BanksResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+
+    EnterpriseResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+
+    ErrorResponse:
+      type: object
+      required:
+        - notifications
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+
+    Notification:
+      type: object
+      properties:
+        category:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        severity:
+          type: string
+
+security:
+  - BearerAuth: []
+
